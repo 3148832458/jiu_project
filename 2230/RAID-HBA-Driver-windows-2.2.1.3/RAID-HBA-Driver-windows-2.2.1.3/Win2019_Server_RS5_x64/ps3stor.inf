@@ -1,0 +1,165 @@
+; INF file for PS3Stor Storage controllers.
+;**********************************************************************
+;                                                                     *
+;   Copyright 2023 Linkdata Corp., Inc. All rights reserved.          *
+;                                                                     *
+;   This file is property of Linkdata Corp., Inc. and is licensed for *
+;   use as is.  The receipt of or possession of this file does not    *
+;   convey any rights to modify its contents, in whole, or in part,   *
+;   without the specific written consent of Linkdata Corp., Inc.      *
+;                                                                     *
+;								                                      *
+; Copyright ? 2023 Linkdata All rights reserved                       *
+;                                                                     *
+;**********************************************************************
+
+[version]
+Signature   ="$Windows NT$"
+Class       = SCSIAdapter
+ClassGUID   = {4d36e97b-e325-11ce-bfc1-08002be10318}
+Provider    = %ManufacturerName%
+CatalogFile = ps3stor.cat
+DriverVer = 05/30/2024,2.2.1.3
+PnpLockDown = 1
+
+[Manufacturer]
+%ManufacturerName%=PS3Stor, NTx86, NTamd64
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+ps3stor.sys = 1
+
+[DestinationDirs]
+DefaultDestDir = 12 ;%windir%\system32\driver,安装目录
+
+[ControlFlags]
+ExcludeFromSelect = * ;作用待调查
+
+[Install_MSI.NT]
+CopyFiles = @ps3stor.sys
+
+[Install_MSI.NT.HW]
+Include = pci.inf ;https://docs.microsoft.com/en-us/windows-hardware/drivers/pci/i-o-resource-usage-reduction
+Needs   = PciIoSpaceNotRequired.HW
+AddReg  = Install_AddReg_HW
+
+[Install_AddReg_HW]
+;https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/enabling-message-signaled-interrupts-in-the-registry
+HKR, Interrupt Management,, 0x00000010 ;添加subkey
+HKR, Interrupt Management\MessageSignaledInterruptProperties,, 0x00000010 ;添加subkey
+HKR, Interrupt Management\MessageSignaledInterruptProperties, MSISupported, %REG_DWORD%, %MSI_ENABLED%
+HKR, Interrupt Management\MessageSignaledInterruptProperties, MessageNumberLimit, %REG_DWORD%, %MSI_VECTOR_NUMBER% ;最大的irq通道分配，该限制与硬件支持的irq数取小
+;https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/interrupt-affinity-and-priority
+HKR, Interrupt Management\Affinity Policy,, 0x00000010
+HKR, Interrupt Management\Affinity Policy, DevicePolicy, %REG_DWORD%, %AcrossAllProcessors% ;设置中断时间与cpu的亲和关系
+HKR, Interrupt Management\Affinity Policy, DevicePriority, %REG_DWORD%, %IrqPriorityHigh% ;高优先级的中断
+HKR, Interrupt Management\Affinity Policy, GroupPolicy, %REG_DWORD%, 1
+
+;https://docs.microsoft.com/en-us/windows-hardware/drivers/install/inf-addservice-directive
+[Install_MSI.NT.Services];驱动安装后的运行的基本状态
+AddService = ps3stor, %SPSVCINST_ASSOCSERVICE%, Driver_Install, EventLog_Install
+
+[Driver_Install]
+ServiceType    = %SERVICE_KERNEL_DRIVER% ;是否是内核驱动
+StartType      = %SERVICE_BOOT_START%
+ErrorControl   = %SERVICE_ERROR_NORMAL%
+ServiceBinary  = %12%\ps3stor.sys
+LoadOrderGroup = SCSI Miniport
+AddReg         = Parms_AddReg
+
+[Parms_AddReg]
+HKR, "Parameters", %BUSTYPE_NAME%, %REG_DWORD%, %BUSTYPE_RAID%
+HKR, "Parameters\PnpInterface", %PCIBUS%, %REG_DWORD%, 1
+HKR, "Parameters\Device", DriverParameter, 0x00000000, "nobusywait=1"
+HKR, "Parameters\Device", PS3StorDriverCommitID, 0x00000000, %PS3STOR_DRV_COMMIT_ID%
+HKR, "Parameters\Device", %512eKey%, %REG_DWORD%, %ENABLED%
+HKR, "Parameters", %TIMEOUT_VALUE%, %REG_DWORD%, %TIMEOUT_SECONDS%
+HKR, "Parameters", %LOG_LEVEL%, %REG_DWORD%, %LEVEL%
+HKR, "Parameters", %CLI_VERSION%, %REG_DWORD%, %CLI_VER%
+HKR, "Parameters", %IO_TRACE_SWITCH%, %REG_DWORD%, %IO_TRACE_VALUE%
+HKR, "StorPort", "PowerSrbTimeout", %REG_DWORD%, 0x28
+
+[EventLog_Install]
+AddReg = EventLog_AddReg
+
+[EventLog_AddReg]
+HKR,,EventMessageFile, %REG_EXPAND_SZ%, "%%SystemRoot%%\System32\IoLogMsg.dll;%%SystemRoot%%\System32\drivers\ps3stor.sys"
+HKR,,TypesSupported, %REG_DWORD%, 7
+
+[PS3STOR.NTx86]
+%ps3storGenericHBA.DeviceDesc%        = Install_MSI, PCI\VEN_1ff2&DEV_20a2 ; asic hba
+%ps3storGenericRAID.DeviceDesc%       = Install_MSI, PCI\VEN_1ff2&DEV_30a2 ; asic raid
+
+%ps3stor223018i.DeviceDesc%           = Install_MSI, PCI\VEN_1ff2&DEV_20a2&SUBSYS_0a211ff2 ;
+%ps3stor223010i.DeviceDesc%           = Install_MSI, PCI\VEN_1ff2&DEV_20a2&SUBSYS_0a221ff2 ;
+%ps3stor223010i8e.DeviceDesc%         = Install_MSI, PCI\VEN_1ff2&DEV_20a2&SUBSYS_0a251ff2 ;
+
+%ps3stor326018i.DeviceDesc%           = Install_MSI, PCI\VEN_1ff2&DEV_30a2&SUBSYS_0b211ff2 ;
+%ps3stor326010i.DeviceDesc%           = Install_MSI, PCI\VEN_1ff2&DEV_30a2&SUBSYS_0b221ff2 ;
+%ps3stor32508i.DeviceDesc%            = Install_MSI, PCI\VEN_1ff2&DEV_30a2&SUBSYS_0b281ff2 ;
+
+[PS3STOR.NTamd64]
+%ps3storGenericHBA.DeviceDesc%        = Install_MSI, PCI\VEN_1ff2&DEV_20a2 ; asic hba
+%ps3storGenericRAID.DeviceDesc%       = Install_MSI, PCI\VEN_1ff2&DEV_30a2 ; asic raid
+
+%ps3stor223018i.DeviceDesc%           = Install_MSI, PCI\VEN_1ff2&DEV_20a2&SUBSYS_0a211ff2 ;
+%ps3stor223010i.DeviceDesc%           = Install_MSI, PCI\VEN_1ff2&DEV_20a2&SUBSYS_0a221ff2 ;
+%ps3stor223010i8e.DeviceDesc%         = Install_MSI, PCI\VEN_1ff2&DEV_20a2&SUBSYS_0a251ff2 ;
+
+%ps3stor326018i.DeviceDesc%           = Install_MSI, PCI\VEN_1ff2&DEV_30a2&SUBSYS_0b211ff2 ;
+%ps3stor326010i.DeviceDesc%           = Install_MSI, PCI\VEN_1ff2&DEV_30a2&SUBSYS_0b221ff2 ;
+%ps3stor32508i.DeviceDesc%            = Install_MSI, PCI\VEN_1ff2&DEV_30a2&SUBSYS_0b281ff2 ;
+
+[Strings]
+;Localizable Strings needed for HBA naming in Windows UI
+ps3storGenericRAID.DeviceDesc      = "PS3Stor RAID Adapter"
+ps3storGenericHBA.DeviceDesc       = "PS3Stor HBA Adapter"
+
+ps3stor223018i.DeviceDesc          = "L-HBA 2230-18i"
+ps3stor223010i.DeviceDesc          = "L-HBA 2230-10i"
+ps3stor223010i8e.DeviceDesc        = "L-HBA 2230-10i8e"
+
+ps3stor326018i.DeviceDesc          = "L-RAID 3260-18i"
+ps3stor326010i.DeviceDesc          = "L-RAID 3260-10i"
+ps3stor32508i.DeviceDesc           = "L-RAID 3250-8i"
+
+;*******************************************
+;Non-Localizable strings
+
+SPSVCINST_ASSOCSERVICE = 0x00000002 ;驱动的服务级别
+SERVICE_KERNEL_DRIVER  = 1
+SERVICE_BOOT_START     = 0 ;0表示系统启动时加载驱动（发布包用该值），1表示系统初始化中加载驱动
+SERVICE_ERROR_NORMAL   = 1
+REG_EXPAND_SZ          = 0x00020000
+REG_DWORD              = 0x00010001
+MSI_VECTOR_NUMBER	   = 256
+
+PCIBUS                  = 5
+TIMEOUT_SECONDS         = 180
+TIMEOUT_VALUE           = "IoTimeoutValue"
+BUSTYPE_NAME            = "BusType"
+BUSTYPE_RAID            = 8
+BUSTYPE_SAS           = 10
+
+LOG_LEVEL				="LogLevel"
+CLI_VERSION			 	="CliVersion"
+IO_TRACE_SWITCH 		="IoTraceSwitch"
+LEVEL					= 1
+CLI_VER					= 0x2000000
+IO_TRACE_VALUE			= 0
+
+MSI_ENABLED             = 1
+AcrossAllProcessors     = 5
+IrqPriorityHigh         = 3
+
+512eKey 		= "EnableQueryAccessAlignment"
+ENABLED 		= 1
+DISABLED		= 0
+
+DiskName = "PS3Stor Installation Disk"
+ManufacturerName="Linkdata Technology"
+PS3STOR_DRV_COMMIT_ID = "458e418 f497f41"
+PS3STOR_DRV_VERSION = "2.2.1.3"
+
